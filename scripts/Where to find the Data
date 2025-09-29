@@ -4,5 +4,5 @@ steps how to use the scripts:
  2 -  data_acquisition
  3 - data_processor 
  4 - tidy_data_creator
- 5 - .....
+ 5 - Interactive NHL Data Explorer with ipywidgets
  6 - .... 
