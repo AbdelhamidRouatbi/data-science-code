@@ -1,3 +1,8 @@
+"""
+NHL Data Processor - Clean Version
+Processes NHL game data with only essential columns for analysis.
+"""
+
 import pandas as pd
 import json
 from pathlib import Path
@@ -5,10 +10,7 @@ from tqdm import tqdm
 
 class NHLDataProcessor:
     """
-    Simple NHL Data Processor
-    - Reads raw game data (JSON)
-    - Extracts only shots and goals
-    - Saves them into tidy CSV files
+    Processes NHL game data from JSON to CSV format with essential columns only.
     """
     
     def __init__(self, raw_data_dir="data/raw", processed_data_dir="data/processed"):
@@ -16,7 +18,7 @@ class NHLDataProcessor:
         self.processed_data_dir = Path(processed_data_dir)
         self.processed_data_dir.mkdir(parents=True, exist_ok=True)
         
-        # Map team IDs to their names (from NHL API)
+        # Team ID to name mapping
         self.team_mapping = {
             '1': 'New Jersey Devils', '2': 'New York Islanders', '3': 'New York Rangers',
             '4': 'Philadelphia Flyers', '5': 'Pittsburgh Penguins', '6': 'Boston Bruins',
@@ -31,60 +33,62 @@ class NHLDataProcessor:
             '54': 'Vegas Golden Knights', '55': 'Seattle Kraken'
         }
         
-        # Player IDs will be stored here later
+        # Player ID to name mapping
         self.player_mapping = {}
     
     def build_player_mapping(self):
-        """Build a dictionary that maps player IDs to names from the roster info"""
+        """Build player ID to name mapping from game roster data"""
         print("Building player name mapping...")
         
         for season in range(2016, 2024):
             season_dir = self.raw_data_dir / f"season_{season}" / "general"
-            if not season_dir.exists():
-                continue
-            
-            # Only look at a few games to save time
-            json_files = list(season_dir.glob("*.json"))[:3]
-            
-            for json_file in json_files:
-                try:
-                    with open(json_file, "r", encoding="utf-8") as f:
-                        game_data = json.load(f)
+            if season_dir.exists():
+                json_files = list(season_dir.glob("*.json"))[:3]  # Sample 3 games per season
+                
+                for json_file in json_files:
+                    try:
+                        with open(json_file, 'r', encoding='utf-8') as f:
+                            game_data = json.load(f)
+                        
+                        roster_spots = game_data.get('rosterSpots', [])
+                        for player in roster_spots:
+                            player_id = str(player.get('playerId', ''))
+                            if player_id and player_id not in self.player_mapping:
+                                first_name = player.get('firstName', {}).get('default', '')
+                                last_name = player.get('lastName', {}).get('default', '')
+                                self.player_mapping[player_id] = f"{first_name} {last_name}".strip()
                     
-                    for player in game_data.get("rosterSpots", []):
-                        player_id = str(player.get("playerId", ""))
-                        if player_id and player_id not in self.player_mapping:
-                            first_name = player.get("firstName", {}).get("default", "")
-                            last_name = player.get("lastName", {}).get("default", "")
-                            self.player_mapping[player_id] = f"{first_name} {last_name}".strip()
-                except:
-                    continue
+                    except Exception:
+                        continue
         
-        print(f"Collected {len(self.player_mapping)} player names")
+        print(f"Built player mapping with {len(self.player_mapping)} players")
     
     def process_all_data(self):
-        """Go through all seasons and process games"""
+        """Process all NHL data with essential columns only"""
         self.build_player_mapping()
         
         valid_seasons = [f"season_{year}" for year in range(2016, 2024)]
         season_folders = [f for f in self.raw_data_dir.iterdir() 
                          if f.is_dir() and f.name in valid_seasons]
         
-        print(f"Found {len(season_folders)} season folders")
+        print(f"Processing {len(season_folders)} season folders")
         
         for season_folder in season_folders:
             season_name = season_folder.name
-            print(f"Processing {season_name}...")
+            print(f"Processing {season_name}")
             
-            for game_type in ["general", "playoff"]:
-                raw_folder = season_folder / game_type
-                if raw_folder.exists():
-                    self._process_game_type_folder(raw_folder, season_name, game_type)
+            general_dir = season_folder / "general"
+            if general_dir.exists():
+                self._process_game_type_folder(general_dir, season_name, "general")
+            
+            playoff_dir = season_folder / "playoff"
+            if playoff_dir.exists():
+                self._process_game_type_folder(playoff_dir, season_name, "playoff")
     
     def _process_game_type_folder(self, raw_folder, season_name, game_type):
-        """Process all games inside one type (general or playoff)"""
+        """Process all JSON files in a folder"""
         json_files = list(raw_folder.glob("*.json"))
-        print(f"  {game_type}: {len(json_files)} games")
+        print(f"  {game_type}: {len(json_files)} games found")
         
         if not json_files:
             return
@@ -94,114 +98,138 @@ class NHLDataProcessor:
         
         all_events = []
         
-        for json_file in tqdm(json_files, desc=f"    {game_type}"):
+        for json_file in tqdm(json_files, desc=f"    Processing {game_type}"):
             try:
                 game_events = self._process_single_game(json_file, season_name, game_type)
                 if game_events:
                     all_events.extend(game_events)
                     
-                    # Save individual game
                     game_id = json_file.stem
-                    pd.DataFrame(game_events).to_csv(processed_folder / f"{game_id}.csv", index=False)
-            except:
+                    game_df = pd.DataFrame(game_events)
+                    csv_path = processed_folder / f"{game_id}.csv"
+                    game_df.to_csv(csv_path, index=False)
+                    
+            except Exception:
                 continue
         
-        # Save all games together
         if all_events:
             combined_df = pd.DataFrame(all_events)
             combined_df = self._calculate_additional_features(combined_df)
-            combined_df.to_csv(processed_folder / f"all_{game_type}_games.csv", index=False)
-            print(f"    Saved {len(combined_df)} events for {game_type}")
+            
+            combined_csv_path = processed_folder / f"all_{game_type}_games.csv"
+            combined_df.to_csv(combined_csv_path, index=False)
+            print(f"Saved {len(combined_df)} events to {combined_csv_path}")
+            
+            # Show sample of the clean data
+            sample_df = combined_df.head(3)
+            print("Sample data:")
+            print(sample_df[['game_id', 'event_type', 'team_name', 'player_name', 'goalie_name', 'shot_type']])
     
     def _process_single_game(self, json_file, season_name, game_type):
-        """Get events (shots + goals) from one game"""
+        """Extract events with clean column structure"""
         try:
-            with open(json_file, "r", encoding="utf-8") as f:
+            with open(json_file, 'r', encoding='utf-8') as f:
                 game_data = json.load(f)
-        except:
+        except Exception:
             return []
         
-        player_mapping = self._extract_game_player_mapping(game_data)
+        game_player_mapping = self._extract_game_player_mapping(game_data)
+        
         game_id = json_file.stem
         events = []
+        plays = game_data.get('plays', [])
         
-        for play in game_data.get("plays", []):
-            event_type = play.get("typeDescKey", "")
-            if event_type not in ["shot-on-goal", "goal"]:
+        for play in plays:
+            event_type = play.get('typeDescKey', '')
+            
+            if event_type not in ['shot-on-goal', 'goal']:
                 continue
             
-            event = self._extract_event_data(play, game_id, season_name, game_type, event_type, player_mapping)
-            if event:
-                events.append(event)
+            event_data = self._extract_event_data(play, game_id, season_name, game_type, event_type, game_player_mapping)
+            if event_data:
+                events.append(event_data)
         
         return events
     
     def _extract_game_player_mapping(self, game_data):
-        """Extract player names for this specific game"""
-        mapping = {}
-        for player in game_data.get("rosterSpots", []):
-            player_id = str(player.get("playerId", ""))
+        """Extract player names from a specific game"""
+        player_mapping = {}
+        roster_spots = game_data.get('rosterSpots', [])
+        
+        for player in roster_spots:
+            player_id = str(player.get('playerId', ''))
             if player_id:
-                first_name = player.get("firstName", {}).get("default", "")
-                last_name = player.get("lastName", {}).get("default", "")
-                mapping[player_id] = f"{first_name} {last_name}".strip()
-        return mapping
+                first_name = player.get('firstName', {}).get('default', '')
+                last_name = player.get('lastName', {}).get('default', '')
+                player_mapping[player_id] = f"{first_name} {last_name}".strip()
+        
+        return player_mapping
     
     def _extract_event_data(self, play, game_id, season_name, game_type, event_type, player_mapping):
-        """Pick out the important details from an event"""
+        """Extract event data with clean columns only"""
         try:
-            details = play.get("details", {})
-            data = {
-                "game_id": game_id,
-                "season": season_name.replace("season_", ""),
-                "game_type": game_type,
-                "event_type": event_type.upper().replace("-", "_"),
-                "period": play.get("periodDescriptor", {}).get("number", 1),
-                "period_time": play.get("timeInPeriod", ""),
-                "x_coord": details.get("xCoord"),
-                "y_coord": details.get("yCoord"),
-                "shot_type": details.get("shotType", ""),
-                "team_id": details.get("eventOwnerTeamId", ""),
+            details = play.get('details', {})
+            
+            event_data = {
+                'game_id': game_id,
+                'season': season_name.replace('season_', ''),
+                'game_type': game_type,
+                'event_type': event_type.upper().replace('-', '_'),
+                'period': play.get('periodDescriptor', {}).get('number', 1),
+                'period_time': play.get('timeInPeriod', ''),
+                'x_coord': details.get('xCoord'),
+                'y_coord': details.get('yCoord'),
+                'shot_type': details.get('shotType', ''),
+                'team_id': details.get('eventOwnerTeamId', ''),
             }
             
-            # Team name
-            data["team_name"] = self.team_mapping.get(str(data["team_id"]), "Unknown")
+            # Map team ID to team name
+            team_id = str(event_data['team_id'])
+            event_data['team_name'] = self.team_mapping.get(team_id, f'Unknown_{team_id}')
             
-            # Shooter / Scorer and Goalie
-            if event_type == "shot-on-goal":
-                shooter_id = str(details.get("shootingPlayerId", ""))
-                goalie_id = str(details.get("goalieInNetId", ""))
-                data["player_name"] = player_mapping.get(shooter_id, f"Player_{shooter_id}")
-                data["goalie_name"] = player_mapping.get(goalie_id, f"Goalie_{goalie_id}")
+            # Handle player names - simplified approach
+            if event_type == 'shot-on-goal':
+                shooter_id = str(details.get('shootingPlayerId', ''))
+                goalie_id = str(details.get('goalieInNetId', ''))
+                
+                event_data['player_name'] = player_mapping.get(shooter_id, 
+                    self.player_mapping.get(shooter_id, f'Player_{shooter_id}'))
+                event_data['goalie_name'] = player_mapping.get(goalie_id, 
+                    self.player_mapping.get(goalie_id, f'Goalie_{goalie_id}'))
+                    
+            elif event_type == 'goal':
+                scorer_id = str(details.get('scoringPlayerId', ''))
+                goalie_id = str(details.get('goalieInNetId', ''))
+                
+                event_data['player_name'] = player_mapping.get(scorer_id, 
+                    self.player_mapping.get(scorer_id, f'Player_{scorer_id}'))
+                event_data['goalie_name'] = player_mapping.get(goalie_id, 
+                    self.player_mapping.get(goalie_id, f'Goalie_{goalie_id}'))
             
-            elif event_type == "goal":
-                scorer_id = str(details.get("scoringPlayerId", ""))
-                goalie_id = str(details.get("goalieInNetId", ""))
-                data["player_name"] = player_mapping.get(scorer_id, f"Player_{scorer_id}")
-                data["goalie_name"] = player_mapping.get(goalie_id, f"Goalie_{goalie_id}")
+            return event_data
             
-            return data
-        except:
+        except Exception:
             return None
     
     def _calculate_additional_features(self, df):
-        """Add extra stats like distance from net and if it was a goal"""
-        df["x_coord"] = pd.to_numeric(df["x_coord"], errors="coerce")
-        df["y_coord"] = pd.to_numeric(df["y_coord"], errors="coerce")
+        """Calculate analytical features"""
+        df['x_coord'] = pd.to_numeric(df['x_coord'], errors='coerce')
+        df['y_coord'] = pd.to_numeric(df['y_coord'], errors='coerce')
         
-        valid = df["x_coord"].notna() & df["y_coord"].notna()
-        df.loc[valid, "distance_from_net"] = (
-            (df.loc[valid, "x_coord"] - 89) ** 2 + df.loc[valid, "y_coord"] ** 2
+        valid_coords = df['x_coord'].notna() & df['y_coord'].notna()
+        df.loc[valid_coords, 'distance_from_net'] = (
+            (df.loc[valid_coords, 'x_coord'] - 89) ** 2 + 
+            df.loc[valid_coords, 'y_coord'] ** 2
         ) ** 0.5
         
-        df["is_goal"] = (df["event_type"] == "GOAL").astype(int)
+        df['is_goal'] = (df['event_type'] == 'GOAL').astype(int)
         
         return df
 
 def main():
     processor = NHLDataProcessor("data/raw", "data/processed")
     processor.process_all_data()
-    print("Done!")
+    print("Data processing complete.")
 
 if __name__ == "__main__":
     main()

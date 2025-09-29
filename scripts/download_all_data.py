@@ -1,3 +1,8 @@
+"""
+NHL Data Downloader — general and playoff games
+Downloads all regular season and playoff games for each year.
+"""
+
 import requests
 import json
 import time

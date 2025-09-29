@@ -1,8 +1,0 @@
-https://drive.google.com/drive/folders/1te0JcGKGH5TTtVMvBBvVLHXPh4FA21kL  in this path youll find the raw + processed + tidy data.
-steps how to use the scripts: 
- 1 - the download_all_data
- 2 -  data_acquisition
- 3 - data_processor 
- 4 - tidy_data_creator
- 5 - Interactive NHL Data Explorer with ipywidgets
- 6 - .... 
