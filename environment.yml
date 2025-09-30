@@ -17,3 +17,5 @@ dependencies:
   - ipywidgets
   - jupyterlab>=3.0.0
   - ipdb
+  - requests>=2.31
+  - python-dotenv>=1.0
