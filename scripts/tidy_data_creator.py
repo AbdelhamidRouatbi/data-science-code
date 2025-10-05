@@ -229,7 +229,7 @@ class NHLTidyDataCreator:
         return df
 
 def main():
-    creator = NHLTidyDataCreator("data/raw", "data/tidy")
+    creator = NHLTidyDataCreator("ift6758/data/raw", "ift6758/data/tidy")
     print("TASK 4: Create tidy data")
     df = creator.create_tidy_dataframe(seasons=[2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023])
     if not df.empty:
