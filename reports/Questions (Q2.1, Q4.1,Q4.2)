@@ -1,0 +1,77 @@
+Q2.1: Interactive Debugging Tool
+
+Implementation Description:
+I created an interactive tool that lets users explore NHL play-by-play data using simple widgets. The user can pick a season (from 2016 to 2023), choose whether the game is from the regular season or playoffs, and select a specific game. There’s also a slider that allows users to move through each event in the game.
+
+The interface has three main panels:
+
+A rink plot that shows where the current event happened
+
+A full overview of all the events for the selected game
+
+Detailed information about the current event (like player name, distance, and coordinates)
+
+Main Features:
+
+Dropdown menus for season, game type, and game ID
+
+A slider to navigate between events
+
+Rink visualization with color-coded events (blue = shots, red star = goals)
+
+Real-time event details including coordinates, distance, and player info
+
+Purpose:
+This tool is mainly used to help debug and check if my data processing works correctly. It lets me see visually whether the coordinates, distances, and shot directions make sense. It’s also useful for comparing my results with the official NHL data to confirm that everything lines up properly.
+
+Important Limitation:
+One big limitation when calculating accurate shot distances is that the NHL data doesn’t include the direction of the shot. It only gives us the shot coordinates, not which net the player was shooting toward. This makes things tricky for shots taken near center ice or from the defensive zone because it’s hard to know which side they were aiming at.
+To handle this, I used a team-period rule: I look at where most of the team’s shots come from during that period to guess which net they’re attacking. It works most of the time, but it’s still an approximation—not a perfect solution.
+
+Q4.1: Dataframe Snippet + Strength Information
+
+Dataframe Example:
+
+# Sample from tidy_data_sample.csv
+game_id,season,game_type,event_type,period,x_coord,y_coord,shot_type,team_name,player_name,distance_from_net,is_goal
+2016020001,2016,general,SHOT_ON_GOAL,1,-77,5,wrist,Toronto Maple Leafs,Player_8478483,13.0,0
+2016020001,2016,general,SHOT_ON_GOAL,1,86,13,wrist,Ottawa Senators,Player_8467967,13.34,0
+2016020001,2016,general,GOAL,1,-20,15,slap,Toronto Maple Leafs,Player_8471239,69.0,1
+
+
+Adding Strength Information:
+To include the actual strength information (like 5v5, 5v4, or 5v3), we can:
+
+Track penalties: See when penalties start and end to know if a team is on the power play or penalty kill.
+
+Use shift data: Count how many players are on the ice for each team at each moment.
+
+Cross-reference game states: Combine penalties and faceoffs to figure out the exact player count situation.
+
+To make this work, we would need to include more event types besides shots and goals, like penalties, faceoffs, and possibly player shifts if that data is available.
+
+Q4.2: Three Additional Features
+
+1. Rebound Classification
+
+How: Check how much time passes between two shots from the same team (for example, less than 3 seconds).
+
+Implementation: Measure time between shots and flag quick ones as rebounds.
+
+Value: Helps identify dangerous scoring chances that happen right after another shot.
+
+2. Shot Off the Rush
+
+How: Look for shots that happen right after entering the offensive zone.
+
+Implementation: If a team enters the zone and shoots within 5 seconds, it counts as a “shot off the rush.”
+
+Value: Highlights fast transition plays compared to organized offensive setups.
+
+3. Shot Quality Metric
+
+How: Combine distance, angle, shot type, and game situation.
+
+Implementation: Use a simple model or machine learning to predict the probability that a shot becomes a goal.
+
+Value: Gives a better picture of shot danger than just looking at distance or angle alone.
