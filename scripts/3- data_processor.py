@@ -1,5 +1,5 @@
 """
-NHL Data Processor - BASIC VERSION
+NHL Data Processor -
 Extracts raw game data and saves it to CSV
 """
 
