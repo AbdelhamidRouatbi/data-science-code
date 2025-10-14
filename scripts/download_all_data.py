@@ -1,6 +1,7 @@
 """
 NHL Data Downloader — general and playoff games
 Downloads all regular season and playoff games for each year.
+uses old API.
 """
 
 import requests
