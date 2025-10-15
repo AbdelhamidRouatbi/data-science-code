@@ -1,0 +1,10 @@
+**Utilisation des LLM dans le projet**
+
+J'ai utilisé un LLM principalement pour :
+
+- Résoudre des erreurs comme les problèmes d'encodage dans les fichiers JSON
+- Améliorer des fonctions existantes, par exemple pour calculer plus efficacement la distance des tirs
+- Trouver comment créer l'interface interactive avec ipywidgets
+- Déboguer quand le traitement des données ne fonctionnait pas
+
+Le développement du projet, l'analyse des données et les conclusions restent entièrement de mon travail.
