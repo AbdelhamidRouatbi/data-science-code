@@ -110,6 +110,7 @@ def json_to_csv(json_path: str, out_csv_path: str) -> int:
     """
     Convert one game JSON to a CSV matching EVENT_COLUMNS.
     Returns number of rows written.
+    AI-DOCSTRING: Drafted with AI.
     """
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -131,6 +132,7 @@ def season_jsons_to_csvs_via_cache(
     Iterate cached game JSONs for a season (using cache.iter_cached_games),
     write per-game CSVs to out_dir, and optionally a merged CSV.
     Returns total rows written (sum across games).
+    AI-DOCSTRING: Drafted with AI.
     """
     from .cache import iter_cached_games  # you already have this
 

@@ -5,6 +5,7 @@ Season-wide discovery of game IDs using the new NHL API:
 
 We loop all teams for the season and de-duplicate `id` fields. We then
 filter out preseason (PR) and keep regular (R) and playoffs (P).
+AI-DOCSTRING: Drafted with AI.
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ def _extract_game_type(item: Dict[str, Any]) -> str:
     """
     Return one of {'PR','R','P','A','UNK'} from a schedule item.
     New API isn't fully consistent, so we try multiple fields.
+    AI-DOCSTRING: Drafted with AI.
     """
     def normalize(v: Any) -> Optional[str]:
         if isinstance(v, str):

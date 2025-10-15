@@ -2,11 +2,24 @@
 Command line interface with progress bar support (tqdm).
 
 Examples:
-  python -m nhl_pbp ids 2016
   python -m nhl_pbp season 2016 --limit 50
   python -m nhl_pbp fetch 2017020001 2017020002 --force
   python -m nhl_pbp seasons --start 2016 --end 2023
-  python -m nhl_pbp manifest 2016 --out data/2016-2017_manifest.csv
+  python -m nhl_pbp pipeline --start 2016 --end 2023 --out-dir-base nhl/csv --merged-base nhl/csv
+
+AI ASSISTANCE DISCLOSURE
+------------------------
+Summary: I (Aftab) wrote the initial shell and baseline API interactions.
+I later consulted ChatGPT for high-level guidance and iteration ideas, including:
+- designing a consistent CLI with subcommands/flags and a progress toggle,
+- modularizing code into downloader/config/transform modules,
+- suggestions for adding caching (implemented in NHLPBPDownloader elsewhere),
+- using a simple config system to reduce runtime flags,
+- drafting function docstrings.
+
+All code here was reviewed, edited, and tested by me. Inline markers "AI-ASSISTED" indicate
+spots influenced by AI suggestions. Docstrings labeled "AI-DOCSTRING" were initially drafted
+with AI assistance and then revised by me.
 """
 
 from __future__ import annotations
@@ -17,21 +30,38 @@ from .config import REQUIRED_SEASONS, SHOW_PROGRESS
 from .transform import json_to_csv, season_jsons_to_csvs_via_cache
 
 def _add_common_filters(p: argparse.ArgumentParser) -> None:
+    """Resolve inclusion flags for regular/playoffs based on CLI args.
+
+    AI-DOCSTRING: Drafted with AI; logic verified by Aftab.
+    """
     p.add_argument("--regular", action="store_true", help="Include regular season games")
     p.add_argument("--playoffs", action="store_true", help="Include playoff games")
     p.add_argument("--limit", type=int, default=None, help="Limit number of games (for quick tests)")
     p.add_argument("--no-progress", action="store_true", help="Disable tqdm progress bars")
 
 def _resolve_filters(args) -> tuple[bool,bool]:
+    """Resolve inclusion flags for regular/playoffs based on CLI args.
+
+    AI-DOCSTRING: Drafted with AI; logic verified by Aftab.
+    """
     # Default to both if neither specified; else honor the flags
     inc_r = args.regular or (not args.regular and not args.playoffs)
     inc_p = args.playoffs or (not args.regular and not args.playoffs)
     return inc_r, inc_p
 
 def _progress_from_args(args) -> bool:
+    """Return whether progress bars should be shown, honoring --no-progress
+    and the SHOW_PROGRESS config default.
+
+    AI-DOCSTRING: Drafted with AI.
+    """
     return False if args.no_progress else SHOW_PROGRESS
 
 def cmd_ids(args) -> int:
+    """Print game IDs for a given season, honoring filters and progress.
+
+    AI-DOCSTRING: Drafted with AI.
+    """
     dl = NHLPBPDownloader()
     inc_r, inc_p = _resolve_filters(args)
     ids = dl.list_game_ids_for_season(args.season, include_regular=inc_r, include_playoffs=inc_p, progress=_progress_from_args(args))
@@ -41,6 +71,10 @@ def cmd_ids(args) -> int:
     return 0
 
 def cmd_fetch(args) -> int:
+    """Fetch and cache specific game IDs. Use --force to re-download.
+
+    AI-DOCSTRING: Drafted with AI.
+    """
     dl = NHLPBPDownloader()
     for gid in args.game_ids:
         dl.fetch_and_cache_pbp(int(gid), force=args.force)
@@ -48,6 +82,10 @@ def cmd_fetch(args) -> int:
     return 0
 
 def cmd_season(args) -> int:
+    """Download and cache one season (regular + playoffs by default).
+
+    AI-DOCSTRING: Drafted with AI.
+    """
     dl = NHLPBPDownloader()
     inc_r, inc_p = _resolve_filters(args)
     ids = dl.download_season(args.season, include_regular=inc_r, include_playoffs=inc_p,
@@ -56,6 +94,10 @@ def cmd_season(args) -> int:
     return 0
 
 def cmd_seasons(args) -> int:
+    """Download and cache a range of seasons (inclusive).
+
+    AI-DOCSTRING: Drafted with AI.
+    """
     dl = NHLPBPDownloader()
     start, end = args.start, args.end
     for y in range(start, end+1):
@@ -69,6 +111,15 @@ def _season_dir(y: int) -> str:
     return f"{y}-{y+1}"
 
 def cmd_pipeline(args) -> int:
+    """End-to-end pipeline: download seasons and convert cached JSON to CSV.
+
+    Steps:
+      1) Download (respects cache; use --force with 'fetch' to override).
+      2) Convert from cache to per-game CSVs and optional merged per-season CSV.
+
+    AI-DOCSTRING: Drafted with AI.
+    AI-ASSISTED: Guided by ChatGPT to build one consolidated pipeline that does all operations in one go. — Aftab
+    """
     dl = NHLPBPDownloader()
     inc_r, inc_p = _resolve_filters(args)
     grand_total = 0
@@ -92,6 +143,11 @@ def cmd_pipeline(args) -> int:
     return 0
 
 def build_parser() -> argparse.ArgumentParser:
+    """Construct the top-level argparse parser and subcommands.
+
+    AI-ASSISTED: ChatGPT suggested the overall CLI layout (subparsers, shared flags)
+    and drafted this docstring; I implemented and reviewed the code. — Aftab
+    """
     p = argparse.ArgumentParser(prog="nhl-pbp", description="NHL Play-by-Play Downloader (new NHL API)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -115,23 +171,6 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--end", type=int, default=REQUIRED_SEASONS[-1], help="End season (e.g., 2023)")
     _add_common_filters(sp)
     sp.set_defaults(func=cmd_seasons)
-
-    # sp = sub.add_parser("manifest", help="Write a manifest CSV for a season")
-    # sp.add_argument("season", type=int)
-    # sp.add_argument("--out", required=True, help="Output CSV path")
-    # sp.set_defaults(func=cmd_manifest)
-    
-    # sp = sub.add_parser("to-csv", help="Convert a single game JSON to a CSV (GOAL + SHOT_ON_GOAL only)")
-    # sp.add_argument("--json", required=True, help="Path to a game play-by-play JSON")
-    # sp.add_argument("--out", required=True, help="Output CSV path")
-    # sp.set_defaults(func=cmd_to_csv)
-
-    # sp = sub.add_parser("to-csv-season", help="Convert all cached JSONs for a season to per-game CSVs and an optional merged CSV")
-    # sp.add_argument("season", type=int, help="Season start year (e.g., 2016)")
-    # sp.add_argument("--out-dir", required=True, help="Directory to write per-game CSVs")
-    # sp.add_argument("--merged-out", help="(Optional) path for merged season CSV")
-    # sp.set_defaults(func=cmd_to_csv_season)
-    
     sp = sub.add_parser("pipeline", help="Download and convert a range of seasons in one go")
     sp.add_argument("--start", type=int, default=REQUIRED_SEASONS[0], help="Start season (e.g., 2016)")
     sp.add_argument("--end", type=int, default=REQUIRED_SEASONS[-1], help="End season (e.g., 2023)")
@@ -143,6 +182,10 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 def main(argv: List[str] | None = None) -> int:
+    """Entry point.
+
+    AI-DOCSTRING: Drafted with AI.
+    """
     p = build_parser()
     args = p.parse_args(argv)
     return args.func(args)

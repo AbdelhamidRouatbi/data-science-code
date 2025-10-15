@@ -33,6 +33,7 @@ def read_json(path: str) -> Dict[str, Any]:
 def iter_cached_games(season_start_year: int) -> Iterable[Tuple[int, str]]:
     """
     Yield (game_id, path) for all files in that season folder.
+    AI-DOCSTRING: Drafted with AI.
     """
     folder = season_folder(season_start_year)
     for p in pathlib.Path(folder).glob("*.json"):
@@ -44,6 +45,7 @@ def write_manifest_csv(season_start_year: int, out_path: str) -> int:
     """
     Create a simple manifest CSV for a season: game_id,path,bytes,modified_epoch
     Returns number of rows written.
+    AI-DOCSTRING: Drafted with AI.
     """
     import csv, os
     rows = []

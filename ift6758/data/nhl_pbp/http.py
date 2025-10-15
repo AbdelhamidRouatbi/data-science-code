@@ -1,5 +1,6 @@
 """
 HTTP helper: single robust GET with retries & small backoff.
+AI-DOCSTRING: Drafted with AI.
 """
 
 from __future__ import annotations

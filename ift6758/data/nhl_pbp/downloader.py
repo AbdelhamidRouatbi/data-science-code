@@ -27,6 +27,12 @@ class NHLPBPDownloader:
     fetch_and_cache_pbp(game_id: int, force=False) -> Dict[str, Any]
     download_season(y, include_regular=True, include_playoffs=True, limit=None, progress=SHOW_PROGRESS) -> List[int]
     write_manifest(y, out_csv_path) -> int
+    AI-DOCSTRING: Drafted with AI; logic verified by Aftab.
+    AI-ASSISTED: ChatGPT suggested the thin façade pattern over lower-level helpers
+        (`_discover`, `_fetch`, `write_manifest_csv`), threading a `progress` flag into a
+        `_maybe_tqdm` wrapper, adding a `limit` param for quick tests, adopting a
+        continue-on-error policy in batch downloads, and exposing a `write_manifest(...)`
+        convenience for reproducible outputs. — Aftab
     """
 
     def list_game_ids_for_season(self, season_start_year: int,
