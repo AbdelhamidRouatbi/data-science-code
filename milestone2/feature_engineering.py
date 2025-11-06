@@ -177,7 +177,7 @@ class FeatureEngineering:
         features = ["period_time_seconds", "period", "x_coord", "y_coord",
                     "distance_from_net", "shot_angle", "shot_type", "last_event_type",
                     "last_event_x", "time_since_last_event", "last_event_distance",
-                    "rebound", "angle_change", "event_speed"]
+                    "rebound", "angle_change", "event_speed", "is_goal"]
         df_train_2 = df_train_2[features].copy()
         # --- saving feature engineering 2 --- #
         print("saving test data 2 ...")
