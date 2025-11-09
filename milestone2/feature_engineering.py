@@ -161,8 +161,8 @@ class FeatureEngineering:
         baseline_train_path = os.path.join(self._save_data_path, "baseline_train.csv")
         advanced_train_path = os.path.join(self._save_data_path, "advanced_train.csv")
         test_path = os.path.join(self._save_data_path, "test.csv")
-        test_baseline_path = os.path.join(self._save_data_path, "test_baseline.csv")
-        test_advanced_path = os.path.join(self._save_data_path, "test_advanced.csv")
+        test_baseline_path = os.path.join(self._save_data_path, "baseline_test.csv")
+        test_advanced_path = os.path.join(self._save_data_path, "advanced_test.csv")
 
         os.makedirs(os.path.dirname(self._save_data_path), exist_ok=True)
 
