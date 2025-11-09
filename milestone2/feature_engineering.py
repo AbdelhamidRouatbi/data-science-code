@@ -157,32 +157,68 @@ class FeatureEngineering:
         df_train, df_test = self._split_data()
         print("splitting data ✅")
 
-        # --- feature engineering 1 --- #
-        print("feature engineering 1 ...")
-        df_train_1 = self.feature_engineering_1(df_train)
-        print("feature engineering 1 ✅")
+        # Define paths
+        baseline_train_path = os.path.join(self._save_data_path, "baseline_train.csv")
+        advanced_train_path = os.path.join(self._save_data_path, "advanced_train.csv")
+        test_path = os.path.join(self._save_data_path, "test.csv")
+        test_baseline_path = os.path.join(self._save_data_path, "test_baseline.csv")
+        test_advanced_path = os.path.join(self._save_data_path, "test_advanced.csv")
 
-        # --- save feature engineering 1 and test data --- #
-        print("saving test data and baseline training data ...")
         os.makedirs(os.path.dirname(self._save_data_path), exist_ok=True)
-        df_train_1.to_csv(self._save_data_path + "baseline_train.csv", index=False)
-        df_test.to_csv(self._save_data_path + "test.csv", index=False)
-        print("saving test data and baseline training data ✅")
+
+        # --- feature engineering 1 --- #
+        if not os.path.exists(baseline_train_path):
+            print("feature engineering 1 ...")
+            df_train_1 = self.feature_engineering_1(df_train)
+            print("feature engineering 1 ✅")
+
+            print("saving test data and baseline training data ...")
+            df_train_1.to_csv(baseline_train_path, index=False)
+            df_test.to_csv(test_path, index=False)
+            print("saving test data and baseline training data ✅")
+        else:
+            print("baseline_train.csv already exists, skipping feature engineering 1")
+            df_train_1 = pd.read_csv(baseline_train_path)
+            df_test = pd.read_csv(test_path)
 
         # --- feature engineering 2 --- #
-        print("feature engineering 2 ...")
-        df_train_2 = self.feature_engineering_2(df_train)
-        df_train_2 = self._last_event_features(df_train_2)
-        print("feature engineering 2 ✅")
-        features = ["period_time_seconds", "period", "x_coord", "y_coord",
-                    "distance_from_net", "shot_angle", "shot_type", "last_event_type",
-                    "last_event_x", "time_since_last_event", "last_event_distance",
-                    "rebound", "angle_change", "event_speed", "is_goal"]
-        df_train_2 = df_train_2[features].copy()
-        # --- saving feature engineering 2 --- #
-        print("saving test data 2 ...")
-        df_train_2.to_csv(self._save_data_path + "advanced_train.csv", index=False)
-        print("saving test data 2 ✅")
+        if not os.path.exists(advanced_train_path):
+            print("feature engineering 2 ...")
+            df_train_2 = self.feature_engineering_2(df_train)
+            df_train_2 = self._last_event_features(df_train_2)
+            print("feature engineering 2 ✅")
+
+            features = [
+                "period_time_seconds", "period", "x_coord", "y_coord",
+                "distance_from_net", "shot_angle", "shot_type", "last_event_type",
+                "last_event_x", "time_since_last_event", "last_event_distance",
+                "rebound", "angle_change", "event_speed", "is_goal"
+            ]
+            df_train_2 = df_train_2[features].copy()
+
+            print("saving advanced_train.csv ...")
+            df_train_2.to_csv(advanced_train_path, index=False)
+            print("saving advanced_train.csv ✅")
+        else:
+            print("advanced_train.csv already exists, skipping feature engineering 2")
+            df_train_2 = pd.read_csv(advanced_train_path)
+
+        # --- feature engineering for test data --- #
+        if not os.path.exists(test_baseline_path) or not os.path.exists(test_advanced_path):
+            print("feature engineering test data...")
+            df_test_1 = self.feature_engineering_1(df_test)
+            df_test_2 = self.feature_engineering_2(df_test)
+            print("feature engineering test data ✅")
+
+            print("saving feature engineered test data...")
+            df_test_1.to_csv(test_baseline_path, index=False)
+            df_test_2.to_csv(test_advanced_path, index=False)
+            print("saving feature engineered test data ✅")
+        else:
+            print("Feature-engineered test CSVs already exist, skipping test feature engineering.")
+                
+
+
 
 def main():
     fe = FeatureEngineering()
