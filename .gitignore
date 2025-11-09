@@ -145,3 +145,14 @@ dmypy.json
 /ift6758/data/nhl/raw/
 /ift6758/data/nhl/csv/
 /ift6758/data/nhl/csv/*_events.csv
+
+milestone2/wandb/
+milestone2/artifacts/
+milestone2/catboost_info/
+milestone2/*.cbm
+milestone2/*.joblib
+milestone2/*.pkl
+milestone2/figs_q6/  
+# Common cruft
+.DS_Store
+.ipynb_checkpoints/
