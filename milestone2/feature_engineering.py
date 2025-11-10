@@ -238,8 +238,10 @@ class FeatureEngineering:
         baseline_train_path = os.path.join(self._save_data_path, "baseline_train.csv")
         advanced_train_path = os.path.join(self._save_data_path, "advanced_train.csv")
         test_path = os.path.join(self._save_data_path, "test.csv")
-        test_baseline_path = os.path.join(self._save_data_path, "baseline_test.csv")
-        test_advanced_path = os.path.join(self._save_data_path, "advanced_test.csv")
+        test_baseline_general_path = os.path.join(self._save_data_path, "baseline_general_test.csv")
+        test_baseline_playoff_path = os.path.join(self._save_data_path, "baseline_playoff_test.csv")
+        test_advanced_general_path = os.path.join(self._save_data_path, "advanced_general_test.csv")
+        test_advanced_playoff_path = os.path.join(self._save_data_path, "advanced_playoff_test.csv")
 
         os.makedirs(os.path.dirname(self._save_data_path), exist_ok=True)
 
@@ -271,19 +273,36 @@ class FeatureEngineering:
             df_train_2 = pd.read_csv(advanced_train_path)
 
         # --- feature engineering for test data --- #
-        if not os.path.exists(test_baseline_path) or not os.path.exists(test_advanced_path):
+        if not all(os.path.exists(p) for p in [
+            test_baseline_general_path,
+            test_baseline_playoff_path,
+            test_advanced_general_path,
+            test_advanced_playoff_path
+        ]):
             print("feature engineering test data...")
-            df_test_1 = self.feature_engineering_1(df_test)
-            df_test_2 = self.feature_engineering_2(df_test)
+
+            # Split by game type
+            df_test_general = df_test[df_test["game_type"] == "general"].copy()
+            df_test_playoff = df_test[df_test["game_type"] == "playoff"].copy()
+
+            # Apply feature engineering
+            df_test_general_baseline = self.feature_engineering_1(df_test_general)
+            df_test_playoff_baseline = self.feature_engineering_1(df_test_playoff)
+            df_test_general_advanced = self.feature_engineering_2(df_test_general)
+            df_test_playoff_advanced = self.feature_engineering_2(df_test_playoff)
+
             print("feature engineering test data ✅")
 
+            # Save results
             print("saving feature engineered test data...")
-            df_test_1.to_csv(test_baseline_path, index=False)
-            df_test_2.to_csv(test_advanced_path, index=False)
+            df_test_general_baseline.to_csv(test_baseline_general_path, index=False)
+            df_test_playoff_baseline.to_csv(test_baseline_playoff_path, index=False)
+            df_test_general_advanced.to_csv(test_advanced_general_path, index=False)
+            df_test_playoff_advanced.to_csv(test_advanced_playoff_path, index=False)
             print("saving feature engineered test data ✅")
+
         else:
-            print("Feature-engineered test CSVs already exist, skipping test feature engineering.")
-                
+            print("Feature-engineered test CSVs already exist, skipping test feature engineering.")                
 
 
 
