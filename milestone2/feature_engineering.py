@@ -29,8 +29,8 @@ class FeatureEngineering:
 
     def feature_engineering_1(self, df):
         features = ["distance_from_net", "shot_angle", "empty_net", "is_goal"]
+        df["empty_net"] = df["goalie_name"].isna().astype(int)
         df = df[features].copy()
-        df["empty_net"] = df["empty_net"].astype(int)
         return df
 
     def _load_raw_game(self, game_id):
@@ -54,15 +54,17 @@ class FeatureEngineering:
     def _get_last_event(self, row):
         previous_events = [
             play for play in self._cached_game["plays"] if (
-                (self._to_seconds(play.get("timeInPeriod")) < row["period_time_seconds"]) and
+                (self._to_seconds(play.get("timeInPeriod")) <= row["period_time_seconds"]) and
                 (play.get("periodDescriptor").get("number") == 1)
             )
         ]
         try:
-            previous_event = previous_events[-1]
+            previous_event = previous_events[-2]
+            current_event = previous_events[-1]
         except IndexError:
             previous_event = None
-        return previous_event
+            current_event = None
+        return previous_events
 
     def _format_event(self, event):
         if not isinstance(event, dict):
@@ -74,49 +76,20 @@ class FeatureEngineering:
         details = event.get("details", {}) or {}
         return {
             "typeDescKey": event.get("typeDescKey"),
+            "situationCode": event.get("situationCode"),
             "details": {
                 "xCoord": details.get("xCoord"),
                 "yCoord": details.get("yCoord"),
+                "teamId": details.get("eventOwnerTeamId")
             },
             "timeInPeriod": event.get("timeInPeriod"),
         }
     
     def feature_engineering_2(self, df):
-        df["last_event_type"] = None
-        df["last_event_x"] = None
-        df["last_event_y"] = None
-        df["last_event_time_seconds"] = None
-        df["last_event_distance"] = None
-        grouped = df.groupby("game_id")
-        for game_id, group in tqdm(grouped, desc="Applying feature engineering 2"):
-            self._load_raw_game(game_id)
-            for _, row in group.iterrows():
-                last_event = self._format_event(self._get_last_event(row))
-                last_event_type = last_event["typeDescKey"]
-                last_event_xcoord = last_event["details"]["xCoord"]
-                last_event_ycoord = last_event["details"]["yCoord"]
-                last_event_time = self._to_seconds(last_event["timeInPeriod"])
-                if (last_event_xcoord is not None and last_event_ycoord is not None):
-                    last_event_distance = math.hypot(
-                        row["x_coord"] - last_event_xcoord,
-                        row["y_coord"] - last_event_ycoord
-                    )
-
-                df.loc[row.name, "last_event_type"] = last_event_type
-                df.loc[row.name, "last_event_x"] = last_event_xcoord 
-                df.loc[row.name, "last_event_y"] = last_event_ycoord
-                if last_event_time is not None:
-                    time_diff = row["period_time_seconds"] - last_event_time
-                else:
-                    time_diff = None
-                df.loc[row.name, "time_since_last_event"] = time_diff
-                df.loc[row.name, "last_event_distance"] = last_event_distance
-        return df                
-
-    def _last_event_features(self, df):
         def compute_angle(x,y):
             if x is None or y is None:
                 return None
+            y = abs(y)
             net_right = (89, 0)
             net_left = (-89, 0)
             dist_right = np.hypot(x - net_right[0], y - net_right[1])
@@ -124,32 +97,136 @@ class FeatureEngineering:
             net_x, net_y = (net_right if dist_right < dist_left else net_left)
             angle = np.degrees(np.arctan2(net_y-y, net_x-x))
             return angle
-        
-        def angle_change(row):
-            if not row["rebound"]:
+
+        def is_powerplay(event):
+            try:
+                situationCode = event["situationCode"]
+                return situationCode[1] != situationCode[2]
+            except:
+                return False
+
+        def compute_time_since_powerplay(previous_events):
+            try:
+                current_event = previous_events[-1]
+                current_time = self._to_seconds(current_event["timeInPeriod"])
+                powerplay_start_event = current_event
+                if not is_powerplay(current_event):
+                    return 0
+                for event in reversed(previous_events):
+                    if not is_powerplay(event):
+                        powerplay_start_event = event
+                        break
+                powerplay_start_time = self._to_seconds(powerplay_start_event["timeInPeriod"])
+                return current_time - powerplay_start_time
+            except:
                 return 0
-            angle_now = row["shot_angle"]
-            angle_last = compute_angle(row["last_event_x"], row["last_event_y"])
-            if angle_now is None or angle_last is None:
-                return None
-            diff = abs(angle_now - angle_last)
-            if diff > 180:
-                diff = 360 - diff
-            return diff
+            
+        df["empty_net"] = df["goalie_name"].isna().astype(int)
+        df["last_event_type"] = None
+        df["last_event_x"] = None
+        df["last_event_y"] = None
+        df["time_since_last_event"] = None
+        df["distance_from_last_event"] = None
+        df["rebound"] = False
+        df["angle_change"] = 0.0
+        df["event_speed"] = 0.0
+        df["friendly_player_count"] = 5
+        df["opponent_player_count"] = 5
+        df["player_count_diff"] = 0
+        df["time_since_powerplay"] = 0
+        grouped = df.groupby("game_id")
+        for game_id, group in tqdm(grouped, desc="Applying feature engineering 2"):
+            self._load_raw_game(game_id)
+            home_team = self._cached_game["homeTeam"]["id"]
+            away_team = self._cached_game["awayTeam"]["id"]
+            for _, row in group.iterrows():
+                previous_events= self._get_last_event(row)
+                try:
+                    current_event = previous_events[-1]
+                except:
+                    current_event = None
+                try:
+                    last_event = previous_events[-2]
+                except:
+                    last_event = None
+                    
+                current_event = self._format_event(current_event)
+                last_event = self._format_event(last_event)
+                
+                last_event_type = last_event["typeDescKey"]
+                last_event_xcoord = last_event["details"]["xCoord"]
+                last_event_ycoord = last_event["details"]["yCoord"]
+                try:
+                    time_since_last_event = row["period_time_seconds"] - self._to_seconds(last_event["timeInPeriod"])
+                except:
+                    time_since_last_event = None 
+                distance_from_last_event = None
+                if (last_event_xcoord is not None and last_event_ycoord is not None):
+                    distance_from_last_event = math.hypot(
+                        row["x_coord"] - last_event_xcoord,
+                        row["y_coord"] - last_event_ycoord
+                    )
 
-        def compute_speed(row):
-            dist = row.get("last_event_distance")
-            time = row.get("time_since_last_event")
-            if dist is None or time is None or time == 0 or pd.isna(dist) or pd.isna(time):
-                return None
-            return dist / time
-        df["rebound"] = df["last_event_type"].str.contains("shot", case=False, na=False)
-        df["angle_change"] = df.apply(angle_change, axis=1)
-        df["event_speed"] = df.apply(compute_speed, axis=1)
-        return df
+                try: 
+                    rebound = (
+                        "shot" in last_event_type.lower() and
+                        last_event_type.lower() != "blocked-shot" and 
+                        current_event["details"]["teamId"] == last_event["details"]["teamId"]
+                    )
+                except:
+                    rebound = False
 
+                angle_change = 0
+                if (rebound):
+                    last_event_angle = compute_angle(last_event_xcoord, last_event_ycoord)
+                    diff = abs(row["shot_angle"] - last_event_angle)
+                    if diff > 180:
+                        diff = 360 - diff
+                    angle_change = diff
+                    
+                try:
+                    event_speed = distance_from_last_event/time_since_last_event
+                except:
+                    event_speed = 0
+                    
+                try:
+                    situation_code = current_event["situationCode"]
+                    if current_event["details"]["teamId"] == home_team:
+                        friendly_player_count = int(situation_code[2])
+                        opponent_player_count = int(situation_code[1])
+                    elif current_event["details"]["teamId"] == away_team:
+                        friendly_player_count = int(situation_code[1])
+                        opponent_player_count = int(situation_code[2])
+                except:
+                    friendly_player_count = 5
+                    opponent_player_count = 5
 
+                time_since_powerplay = compute_time_since_powerplay(previous_events)
 
+                values = {
+                    "last_event_type": last_event_type,
+                    "last_event_x": last_event_xcoord,
+                    "last_event_y": last_event_ycoord,
+                    "time_since_last_event": time_since_last_event,
+                    "last_event_distance": distance_from_last_event,
+                    "rebound": rebound,
+                    "angle_change": angle_change,
+                    "event_speed": event_speed,
+                    "friendly_player_count": friendly_player_count,
+                    "opponent_player_count": opponent_player_count,
+                    "player_count_diff": friendly_player_count - opponent_player_count,
+                    "time_since_powerplay": time_since_powerplay,
+                }
+
+                for col, val in values.items():
+                    df.at[row.name, col] = val
+        features = [
+            "period_time_seconds", "period", "x_coord", "y_coord",
+            "distance_from_net", "shot_angle", "shot_type", "empty_net", "last_event_type",
+            "last_event_x", "last_event_y", "time_since_last_event", "last_event_distance",
+            "rebound", "angle_change", "event_speed", "friendly_player_count", "opponent_player_count", "player_count_diff", "time_since_powerplay", "is_goal"
+        ]
+        return df[features].copy()
 
     def create_data(self):
         # --- split data --- #
@@ -185,17 +262,7 @@ class FeatureEngineering:
         if not os.path.exists(advanced_train_path):
             print("feature engineering 2 ...")
             df_train_2 = self.feature_engineering_2(df_train)
-            df_train_2 = self._last_event_features(df_train_2)
             print("feature engineering 2 ✅")
-
-            features = [
-                "period_time_seconds", "period", "x_coord", "y_coord",
-                "distance_from_net", "shot_angle", "shot_type", "last_event_type",
-                "last_event_x", "time_since_last_event", "last_event_distance",
-                "rebound", "angle_change", "event_speed", "is_goal"
-            ]
-            df_train_2 = df_train_2[features].copy()
-
             print("saving advanced_train.csv ...")
             df_train_2.to_csv(advanced_train_path, index=False)
             print("saving advanced_train.csv ✅")
