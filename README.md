@@ -5,6 +5,6 @@
 #### Katia Djerroud <katia.djerroud@umontreal.ca> (only for Milestone1)
 #### Antonios Lagarias <antonios.lagarias@umontreal.ca>
 
-This repo corresponds to team 4's submission of Milestone 1 (code).
+This repo corresponds to team 4's submission of Milestones 1, 2 and 3 (code).
 
 
