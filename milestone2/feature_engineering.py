@@ -310,7 +310,7 @@ class FeatureEngineering:
         df = df[df["game_id"] == 2017021065].copy()
         df = self.feature_engineering_2(df)
         print("")
-        run = wandb.init(project="milestone2")
+        run = wandb.init(project="milestone_2")
         # create a wandb Artifact for each meaningful step
         artifact = wandb.Artifact(
             "wpg_v_wsh_2017021065",
