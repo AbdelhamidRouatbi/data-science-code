@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 from tqdm import tqdm
 import math
+import wandb
 
 class FeatureEngineering:
 
@@ -300,15 +301,32 @@ class FeatureEngineering:
             df_test_general_advanced.to_csv(test_advanced_general_path, index=False)
             df_test_playoff_advanced.to_csv(test_advanced_playoff_path, index=False)
             print("saving feature engineered test data ✅")
-
         else:
             print("Feature-engineered test CSVs already exist, skipping test feature engineering.")                
+
+
+    def generate_winnipeg_washington_df(self):
+        df = pd.read_csv(self._tidy_data_path_csv)
+        df = df[df["game_id"] == 2017021065].copy()
+        df = self.feature_engineering_2(df)
+        print("")
+        run = wandb.init(project="milestone2")
+        # create a wandb Artifact for each meaningful step
+        artifact = wandb.Artifact(
+            "wpg_v_wsh_2017021065",
+            type="dataset"
+            )
+        # add data
+        my_table = wandb.Table(dataframe=df)
+        artifact.add(my_table, "wpg_v_wsh_2017021065")
+        run.log_artifact(artifact)        
 
 
 
 def main():
     fe = FeatureEngineering()
     fe.create_data()
+    #fe.generate_winnipeg_washington_df()
 
 if __name__ == "__main__":
     main()
