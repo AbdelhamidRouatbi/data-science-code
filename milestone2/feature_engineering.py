@@ -7,11 +7,18 @@ import math
 import wandb
 
 class FeatureEngineering:
+    """
+    Provides utilities to load NHL play-by-play data, compute engineered features,
+    and export baseline and advanced datasets for model training and testing.
+    """
 
     def __init__(self, tidy_data_path_csv = "data/tidy/all_seasons_combined.csv",
                  raw_data_path = "data/raw/",
                  save_data_path = "data/milestone2/"
                 ):
+        """
+        Initialize data paths and internal cache for raw game data.
+        """
         self._tidy_data_path_csv = tidy_data_path_csv
         self._raw_data_path = raw_data_path
         self._save_data_path = save_data_path
@@ -19,6 +26,9 @@ class FeatureEngineering:
         self._cached_game = None
 
     def _split_data(self):
+        """
+        Split tidy data into training dataset (seasons 2016 to 2019) and test dataset (season 2020).
+        """
         try:
             df = pd.read_csv(self._tidy_data_path_csv)
         except FileNotFoundError:
@@ -29,12 +39,18 @@ class FeatureEngineering:
         return df_train, df_test
 
     def feature_engineering_1(self, df):
+        """
+        Apply part 1 feature engineering to df.
+        """
         features = ["distance_from_net", "shot_angle", "empty_net", "is_goal"]
         df["empty_net"] = df["goalie_name"].isna().astype(int)
         df = df[features].copy()
         return df
 
     def _load_raw_game(self, game_id):
+        """
+        Load the raw JSON game data with id `game_id` into the cache variable.
+        """
         # load raw game json in cache
         season = str(game_id)[:4]
         is_regular = str(game_id)[4:6] == "02"
@@ -47,27 +63,30 @@ class FeatureEngineering:
             self._cached_game = json.load(f)
 
     def _to_seconds(self, t):
+        """
+        Converts mm:ss time format into seconds.
+        """
         if t is None:
             return None
         m, s = map(int, t.split(":"))
         return m * 60 + s
 
-    def _get_last_event(self, row):
+    def _get_last_events(self, row):
+        """
+        Get all events previous to the event described by `row`.
+        """
         previous_events = [
             play for play in self._cached_game["plays"] if (
                 (self._to_seconds(play.get("timeInPeriod")) <= row["period_time_seconds"]) and
                 (play.get("periodDescriptor").get("number") == 1)
             )
         ]
-        try:
-            previous_event = previous_events[-2]
-            current_event = previous_events[-1]
-        except IndexError:
-            previous_event = None
-            current_event = None
         return previous_events
 
     def _format_event(self, event):
+        """
+        Format event data for robust extraction by setting all required fields.
+        """
         if not isinstance(event, dict):
             return {
                 "typeDescKey": None,
@@ -87,7 +106,15 @@ class FeatureEngineering:
         }
     
     def feature_engineering_2(self, df):
+        """
+        Apply second part feature engineering to df.
+        """
         def compute_angle(x,y):
+            """
+            Compute angle between a shot performed at corrdinates `x` and `y` to the net.
+            Assumes the corresponding net is the closest to the shot.
+            Used for calculating shot angle of previous events in the case of a reboudn play.
+            """
             if x is None or y is None:
                 return None
             y = abs(y)
@@ -100,6 +127,9 @@ class FeatureEngineering:
             return angle
 
         def is_powerplay(event):
+            """
+            Returns true if `event` happened during a power-play, false otherwise.
+            """
             try:
                 situationCode = event["situationCode"]
                 return situationCode[1] != situationCode[2]
@@ -107,6 +137,9 @@ class FeatureEngineering:
                 return False
 
         def compute_time_since_powerplay(previous_events):
+            """
+            Returns time in seconds since current power-play started, 0 if not a powerplay.
+            """
             try:
                 current_event = previous_events[-1]
                 current_time = self._to_seconds(current_event["timeInPeriod"])
@@ -230,6 +263,9 @@ class FeatureEngineering:
         return df[features].copy()
 
     def create_data(self):
+        """
+        Main method to create feature engineered datasets.
+        """
         # --- split data --- #
         print("splitting data ...")
         df_train, df_test = self._split_data()
@@ -306,6 +342,9 @@ class FeatureEngineering:
 
 
     def generate_winnipeg_washington_df(self):
+        """
+        Generate wandb DataFrame artifact for feature engineered winnipeg vs washington game dataframe.
+        """
         df = pd.read_csv(self._tidy_data_path_csv)
         df = df[df["game_id"] == 2017021065].copy()
         df = self.feature_engineering_2(df)
